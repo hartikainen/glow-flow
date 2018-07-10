@@ -24,7 +24,7 @@ class ConvolutionPermute(tfb.Bijector):
     """TODO"""
 
     def __init__(self,
-                 event_ndims=1,
+                 event_ndims=3,
                  event_dims=None,
                  validate_args=False,
                  name="convolution_permute"):
@@ -43,8 +43,8 @@ class ConvolutionPermute(tfb.Bijector):
         Raises:
             ValueError: if TODO happens
         """
-        assert event_ndims == 1, event_ndims
-        assert event_dims is not None and len(event_dims) == 1, event_dims
+        assert event_ndims == 3, event_ndims
+        assert event_dims is not None and len(event_dims) == 3, event_dims
 
         self._graph_parents = []
         self._name = name
@@ -52,21 +52,48 @@ class ConvolutionPermute(tfb.Bijector):
 
         self._event_dims = event_dims
 
+        W, H, C = event_dims
+
+        self.w = tf.get_variable(
+            "w",
+            shape=(1, 1, C, C),
+            dtype=tf.float32,
+            initializer=tf.initializers.orthogonal())
+
         super().__init__(event_ndims=event_ndims,
                          validate_args=validate_args,
                          name=name)
 
     def _forward(self, x):
-        raise NotImplementedError('_forward')
+        z = tf.nn.conv2d(
+            input=x,
+            filter=self.w,
+            strides=(1, 1, 1, 1),
+            padding='SAME',
+            data_format='NHWC')
+
+        return z
 
     def _inverse(self, y):
-        raise NotImplementedError('_inverse')
+        w_inverse = tf.matrix_inverse(self.w)
+        x = tf.nn.conv2d(
+            input=y,
+            filter=w_inverse,
+            strides=(1, 1, 1, 1),
+            padding='SAME',
+            data_format='NHWC')
+
+        return x
 
     def _forward_log_det_jacobian(self, x):
-        raise NotImplementedError('_forward_log_det_jacobian')
+        H, W, _ = self._event_dims
+        determinant = tf.matrix_determinant(tf.cast(self.w, tf.float64))
+        log_det_jacobian = (
+            H * W * tf.cast(tf.log(abs(determinant)), tf.float32))
+        return log_det_jacobian
 
     def _inverse_log_det_jacobian(self, y):
-        raise NotImplementedError('_inverse_log_det_jacobian')
+        return -self.forward_log_det_jacobian(y)
 
     def _maybe_assert_valid_x(self, x):
         """TODO"""
