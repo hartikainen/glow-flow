@@ -24,18 +24,13 @@ class ConvolutionPermute(tfb.Bijector):
     """TODO"""
 
     def __init__(self,
-                 event_ndims=3,
-                 event_dims=None,
                  validate_args=False,
-                 name="convolution_permute"):
+                 name="convolution_permute",
+                 *args, **kwargs):
         """Instantiates the `ConvolutionPermute` normalizing flow.
 
         Args:
             TODO
-            event_ndims: Python scalar indicating the number of dimensions
-                associated with a particular draw from the distribution.
-            event_dims: Python list indicating the size of each dimension
-                associated with a particular draw from the distribution.
             validate_args: Python `bool` indicating whether arguments should be
                 checked for correctness.
             name: Python `str` name given to ops managed by this object.
@@ -43,16 +38,17 @@ class ConvolutionPermute(tfb.Bijector):
         Raises:
             ValueError: if TODO happens
         """
-        assert event_ndims == 3, event_ndims
-        assert event_dims is not None and len(event_dims) == 3, event_dims
-
         self._graph_parents = []
         self._name = name
         self._validate_args = validate_args
 
-        self._event_dims = event_dims
+        self.built = False
 
-        W, H, C = event_dims
+        super(ConvolutionPermute, self).__init__(
+            *args, validate_args=validate_args, name=name, **kwargs)
+
+    def build(self, input_shape):
+        _, W, H, C = self._input_shape = input_shape.as_list()
 
         self.w = tf.get_variable(
             "w",
@@ -60,11 +56,12 @@ class ConvolutionPermute(tfb.Bijector):
             dtype=tf.float32,
             initializer=tf.initializers.orthogonal())
 
-        super().__init__(event_ndims=event_ndims,
-                         validate_args=validate_args,
-                         name=name)
+        self.built = True
 
     def _forward(self, x):
+        if not self.built:
+            self.build(x.get_shape())
+
         z = tf.nn.conv2d(
             input=x,
             filter=self.w,
@@ -75,6 +72,9 @@ class ConvolutionPermute(tfb.Bijector):
         return z
 
     def _inverse(self, y):
+        if not self.built:
+            self.build(y.get_shape())
+
         w_inverse = tf.matrix_inverse(self.w)
         x = tf.nn.conv2d(
             input=y,
@@ -86,7 +86,10 @@ class ConvolutionPermute(tfb.Bijector):
         return x
 
     def _forward_log_det_jacobian(self, x):
-        H, W, _ = self._event_dims
+        if not self.built:
+            self.build(x.get_shape())
+
+        _, H, W, _ = self._input_shape
         determinant = tf.matrix_determinant(tf.cast(self.w, tf.float64))
         log_det_jacobian = (
             H * W * tf.cast(tf.log(abs(determinant)), tf.float32))

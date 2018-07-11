@@ -14,10 +14,7 @@ class TestConvolutionPermute(tf.test.TestCase, snapshottest.TestCase):
     def setUp(self):
         self.batch_size = batch_size = 1
         self.event_dims = event_dims = (4,4,3)
-        self.bijector = ConvolutionPermute(
-            event_ndims=len(event_dims),
-            event_dims=event_dims,
-            validate_args=False)
+        self.bijector = ConvolutionPermute(validate_args=False)
 
     def testForward(self):
         x = tf.random_uniform(
