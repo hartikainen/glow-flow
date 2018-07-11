@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 
-from glow.glow_flow import GlowFlow
+from glow.bijectors.glow_flow import GlowFlow
 
 
 tf.enable_eager_execution()
