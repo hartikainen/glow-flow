@@ -21,8 +21,9 @@ class GlowFlow(tfb.Bijector):
     """TODO"""
 
     def __init__(self,
-                 num_layers=2,
-                 event_ndims=1,
+                 num_levels=2,
+                 level_depth=2,
+                 event_ndims=3,
                  event_dims=None,
                  validate_args=False,
                  name="glow_flow"):
@@ -41,14 +42,15 @@ class GlowFlow(tfb.Bijector):
         Raises:
             ValueError: if TODO happens
         """
-        assert event_ndims == 1, event_ndims
-        assert event_dims is not None and len(event_dims) == 1, event_dims
+        assert event_ndims == 3, event_ndims
+        assert event_dims is not None and len(event_dims) == 3, event_dims
 
         self._graph_parents = []
         self._name = name
         self._validate_args = validate_args
 
-        self._num_layers = num_layers
+        self._num_levels = num_levels
+        self._level_depth = level_depth
 
         self._event_dims = event_dims
 
@@ -59,27 +61,39 @@ class GlowFlow(tfb.Bijector):
                          name=name)
 
     def build(self):
-        num_layers = self._num_layers
-
         flow_parts = []
-        for i in range(num_layers):
-            hidden_sizes = (25, 25)
-            D = np.prod(self._event_dims)
 
-            coupling_layer = tfb.RealNVP(
-                num_masked=D//2,
-                shift_and_log_scale_fn=tfb.real_nvp_default_template(
-                    hidden_layers=hidden_sizes,
-                    # TODO: test tf.nn.relu
-                    activation=tf.nn.tanh))
+        for l in range(self._num_levels):
+            out = squeeze(out)
+            level_flow_parts = []
 
-            flow_parts.append(coupling_layer)
+            for k in range(self._level_depth):
+                shape = out.get_shape()
+                image_shape = shape[1:]
 
-            if i < num_layers - 1:
-                # TODO: Replace this with 1x1 convolution permutation
-                permute_bijector = tfb.Permute(
-                    permutation=list(reversed(range(D))))
-                flow_parts.append(permute_bijector)
+                activation_normalization = tfb.BatchNormalization(
+                    batchnorm_layer=tf.layers.BatchNormalization(axis=-1))
+                convolution_permute = ConvolutionPermute(
+                    event_ndims=3, event_dims=shape[1:])
+                flatten = tfb.Reshape(event_shape_out=(-1, np.prod(image_shape)))
+                affine_coupling = tfb.RealNVP(
+                    num_masked=np.prod(image_shape)//2,
+                    shift_and_log_scale_fn=glow_resnet_template(
+                        hidden_layers=hidden_sizes,
+                        activation=tf.nn.relu))
+                unflatten = tfb.Reshape(event_shape_out=shape)
+
+                level_flow = tfb.Chain(reversed([
+                    activation_normalization,
+                    convolution_permute,
+                    flatten,
+                    affine_coupling,
+                    unflatten,
+                ]))
+
+                level_flow_parts.append(level_flow)
+
+            flow_parts.append(level_flow_parts)
 
         # Note: tfb.Chain applies the list of bijectors in the _reverse_ order
         # of what they are inputted.
@@ -108,3 +122,41 @@ class GlowFlow(tfb.Bijector):
         if not self.validate_args:
             return y
         raise NotImplementedError("_maybe_assert_valid_y")
+
+
+def glow_resnet_template(
+        hidden_layers,
+        shift_only=False,
+        activation=tf.nn.relu,
+        name=None,
+        *args,
+        **kwargs):
+  """Build a scale-and-shift functions using a weight normalized resnet.
+  This will be wrapped in a make_template to ensure the variables are only
+  created once. It takes the `d`-dimensional input x[0:d] and returns the `D-d`
+  dimensional outputs `loc` ("mu") and `log_scale` ("alpha").
+  Arguments:
+    TODO
+  Returns:
+    shift: `Float`-like `Tensor` of shift terms.
+    log_scale: `Float`-like `Tensor` of log(scale) terms.
+  Raises:
+    NotImplementedError: if rightmost dimension of `inputs` is unknown prior to
+      graph execution.
+  #### References
+  TODO
+  """
+
+  with ops.name_scope(name, "glow_resnet_template"):
+    def _fn(x, output_units):
+      """Weight normalized resnet parameterized via `glow_resnet_template`."""
+
+      # TODO: implement resnet
+      x = None
+
+      if shift_only:
+        return x, None
+      shift, log_scale = array_ops.split(x, 2, axis=-1)
+      return shift, log_scale
+    return template_ops.make_template(
+        "glow_resnet_template", _fn)
