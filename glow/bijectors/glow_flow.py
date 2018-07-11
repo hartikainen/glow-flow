@@ -23,18 +23,13 @@ class GlowFlow(tfb.Bijector):
     def __init__(self,
                  num_levels=2,
                  level_depth=2,
-                 event_ndims=3,
-                 event_dims=None,
                  validate_args=False,
-                 name="glow_flow"):
+                 name="glow_flow",
+                 *args, **kwargs):
         """Instantiates the `GlowFlow` normalizing flow.
 
         Args:
             TODO
-            event_ndims: Python scalar indicating the number of dimensions
-                associated with a particular draw from the distribution.
-            event_dims: Python list indicating the size of each dimension
-                associated with a particular draw from the distribution.
             validate_args: Python `bool` indicating whether arguments should be
                 checked for correctness.
             name: Python `str` name given to ops managed by this object.
@@ -42,9 +37,6 @@ class GlowFlow(tfb.Bijector):
         Raises:
             ValueError: if TODO happens
         """
-        assert event_ndims == 3, event_ndims
-        assert event_dims is not None and len(event_dims) == 3, event_dims
-
         self._graph_parents = []
         self._name = name
         self._validate_args = validate_args
@@ -52,15 +44,14 @@ class GlowFlow(tfb.Bijector):
         self._num_levels = num_levels
         self._level_depth = level_depth
 
-        self._event_dims = event_dims
+        self.built = False
 
-        self.build()
+        super(GlowFlow, self).__init__(
+            *args, validate_args=validate_args, name=name **kwargs)
 
-        super().__init__(event_ndims=event_ndims,
-                         validate_args=validate_args,
-                         name=name)
+    def build(self, input_shape):
+        self._input_shape = input_shape
 
-    def build(self):
         flow_parts = []
 
         for l in range(self._num_levels):
@@ -68,7 +59,6 @@ class GlowFlow(tfb.Bijector):
             level_flow_parts = []
 
             for k in range(self._level_depth):
-                shape = out.get_shape()
                 image_shape = shape[1:]
 
                 activation_normalization = tfb.BatchNormalization(
@@ -98,17 +88,30 @@ class GlowFlow(tfb.Bijector):
         # Note: tfb.Chain applies the list of bijectors in the _reverse_ order
         # of what they are inputted.
         self.flow = tfb.Chain(list(reversed(flow_parts)))
+        self.built = True
 
     def _forward(self, x):
+        if not self.built:
+            self.build(x.get_shape())
+
         return self.flow.forward(x)
 
     def _inverse(self, y):
+        if not self.built:
+            self.build(y.get_shape())
+
         return self.flow.inverse(y)
 
     def _forward_log_det_jacobian(self, x):
+        if not self.built:
+            self.build(x.get_shape())
+
         return self.flow.forward_log_det_jacobian(x)
 
     def _inverse_log_det_jacobian(self, y):
+        if not self.built:
+            self.build(y.get_shape())
+
         return  self.flow.inverse_log_det_jacobian(input_)
 
     def _maybe_assert_valid_x(self, x):
