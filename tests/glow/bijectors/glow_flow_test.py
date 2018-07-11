@@ -1,25 +1,32 @@
 import numpy as np
 import tensorflow as tf
+import snapshottest
 
-from glow.bijectors.glow_flow import GlowFlow
+from glow.bijectors import GlowFlow
 
 
 tf.enable_eager_execution()
+tf.set_random_seed(1)
 
-batch_size = 1
-event_dims = (5,)
 
-flow = GlowFlow(num_layers=2,
-                event_ndims=1,
-                event_dims=event_dims,
-                validate_args=False)
+class TestGlowFlow(tf.test.TestCase, snapshottest.TestCase):
 
-x = np.random.rand(batch_size, *event_dims)
+    def setUp(self):
+        self.batch_size = batch_size = 1
+        self.event_dims = event_dims = (4,4,3)
+        self.flow = GlowFlow(num_levels=2,
+                             event_ndims=len(event_dims),
+                             event_dims=event_dims,
+                             validate_args=False)
 
-z = flow.forward(x)
-print('z:', z.numpy())
+    def testBijective(self):
+        x = tf.random_uniform(
+            (self.batch_size, ) + self.event_dims, dtype=tf.float32)
+        x_ = self.bijector.inverse(self.bijector.forward(x))
 
-x_ = flow.inverse(z)
-print('x_', x_.numpy())
+        with self.test_session():
+            self.assertAllEqual(x, x_.numpy())
 
-tf.assert_equal(x, x_)
+
+if __name__ == '__main__':
+  tf.test.main()
