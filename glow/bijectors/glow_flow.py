@@ -128,38 +128,65 @@ class GlowFlow(tfb.Bijector):
 
 
 def glow_resnet_template(
-        hidden_layers,
         shift_only=False,
         activation=tf.nn.relu,
         name=None,
         *args,
         **kwargs):
-  """Build a scale-and-shift functions using a weight normalized resnet.
-  This will be wrapped in a make_template to ensure the variables are only
-  created once. It takes the `d`-dimensional input x[0:d] and returns the `D-d`
-  dimensional outputs `loc` ("mu") and `log_scale` ("alpha").
-  Arguments:
+    """Build a scale-and-shift functions using a weight normalized resnet.
+    This will be wrapped in a make_template to ensure the variables are only
+    created once. It takes the `d`-dimensional input x[0:d] and returns the `D-d`
+    dimensional outputs `loc` ("mu") and `log_scale` ("alpha").
+    Arguments:
+      TODO
+    Returns:
+      shift: `Float`-like `Tensor` of shift terms.
+      log_scale: `Float`-like `Tensor` of log(scale) terms.
+    Raises:
+      NotImplementedError: if rightmost dimension of `inputs` is unknown prior to
+        graph execution.
+    #### References
     TODO
-  Returns:
-    shift: `Float`-like `Tensor` of shift terms.
-    log_scale: `Float`-like `Tensor` of log(scale) terms.
-  Raises:
-    NotImplementedError: if rightmost dimension of `inputs` is unknown prior to
-      graph execution.
-  #### References
-  TODO
-  """
+    """
 
-  with ops.name_scope(name, "glow_resnet_template"):
-    def _fn(x, output_units):
-      """Weight normalized resnet parameterized via `glow_resnet_template`."""
+    with tf.name_scope(name, "glow_resnet_template"):
+        def _fn(x, output_units=None):
+            """Resnet parameterized via `glow_resnet_template`."""
 
-      # TODO: implement resnet
-      x = None
+            output_units = output_units or x.shape.as_list()[-1]
 
-      if shift_only:
-        return x, None
-      shift, log_scale = array_ops.split(x, 2, axis=-1)
-      return shift, log_scale
-    return template_ops.make_template(
-        "glow_resnet_template", _fn)
+            filters = (512, 512)
+            kernel_sizes=((3,3), (3,3))
+
+            for filter_size, kernel_size in zip(filters, kernel_sizes):
+                x = tf.layers.conv2d(
+                    inputs=x,
+                    filters=filter_size,
+                    kernel_size=kernel_size,
+                    strides=(1, 1),
+                    padding='same',
+                    kernel_initializer=tf.random_normal_initializer(0.0, 0.05),
+                    kernel_constraint=lambda kernel: (
+                        tf.nn.l2_normalize(
+                            w, list(range(kernel.shape.ndims-1)))))
+
+                x = tf.layers.batch_normalization(x, axis=-1)
+                x = activation(x)
+
+            from pdb import set_trace; from pprint import pprint; set_trace()
+            x = tf.layers.conv2d(
+                inputs=x,
+                filters=(1 if shift_only else 2) * output_units,
+                kernel_size=(3, 3),
+                strides=(1, 1),
+                padding='same',
+                kernel_initializer=tf.zeros_initializer())
+            x = tf.layers.batch_normalization(x, axis=-1)
+
+            if shift_only:
+                return x, None
+
+            shift, log_scale = tf.split(x, 2, axis=-1)
+            return shift, log_scale
+
+        return tf.make_template("glow_resnet_template", _fn)
