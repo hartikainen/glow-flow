@@ -47,7 +47,7 @@ class GlowFlow(tfb.Bijector):
         self.built = False
 
         super(GlowFlow, self).__init__(
-            *args, validate_args=validate_args, name=name **kwargs)
+            *args, validate_args=validate_args, name=name, **kwargs)
 
     def build(self, input_shape):
         self._input_shape = input_shape
@@ -56,6 +56,7 @@ class GlowFlow(tfb.Bijector):
 
         for l in range(self._num_levels):
             out = squeeze(out)
+
             level_flow_parts = []
 
             for k in range(self._level_depth):
@@ -63,8 +64,7 @@ class GlowFlow(tfb.Bijector):
 
                 activation_normalization = tfb.BatchNormalization(
                     batchnorm_layer=tf.layers.BatchNormalization(axis=-1))
-                convolution_permute = ConvolutionPermute(
-                    event_ndims=3, event_dims=shape[1:])
+                convolution_permute = ConvolutionPermute()
                 flatten = tfb.Reshape(event_shape_out=(-1, np.prod(image_shape)))
                 affine_coupling = tfb.RealNVP(
                     num_masked=np.prod(image_shape)//2,
