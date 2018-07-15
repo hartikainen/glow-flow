@@ -48,6 +48,48 @@ class TestParallel(tf.test.TestCase, snapshottest.TestCase):
                     tf.gather(x_, i, axis=axis),
                     bijector.inverse(tf.gather(z, i, axis=axis)))
 
+    def testForwardLogDetJacobian(self):
+        axis = 1
+        bijectors = [tfb.Exp(), tfb.Softplus()]
+        parallel = Parallel(
+            bijectors=bijectors, split_axis=1, validate_args=False)
+        x = tf.random_uniform(
+            (self.batch_size, ) + self.event_dims, dtype=tf.float64)
+
+        ldj = parallel.forward_log_det_jacobian(
+            x, event_ndims=len(self.event_dims))
+
+        expected_ldj = tf.reduce_sum([
+            bijector.forward_log_det_jacobian(
+                tf.gather(x, i, axis=axis),
+                event_ndims=3)
+                for i, bijector in enumerate(bijectors)
+        ], keep_dims=True)
+
+        with self.test_session():
+            self.assertAllClose(ldj, expected_ldj)
+
+    def testInverseLogDetJacobian(self):
+        axis = 1
+        bijectors = [tfb.Exp(), tfb.Softplus()]
+        parallel = Parallel(
+            bijectors=bijectors, split_axis=1, validate_args=False)
+        z = tf.random_uniform(
+            (self.batch_size, ) + self.event_dims, dtype=tf.float64)
+
+        ildj = parallel.inverse_log_det_jacobian(
+            z, event_ndims=len(self.event_dims))
+
+        expected_ildj = tf.reduce_sum([
+            bijector.inverse_log_det_jacobian(
+                tf.gather(z, i, axis=axis),
+                event_ndims=3)
+                for i, bijector in enumerate(bijectors)
+        ], keep_dims=True)
+
+        with self.test_session():
+            self.assertAllClose(ildj, expected_ildj)
+
     def testBijective(self):
         bijectors = [tfb.Exp(), tfb.Softplus()]
         parallel = Parallel(
