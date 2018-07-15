@@ -56,10 +56,10 @@ class TestParallel(tf.test.TestCase, snapshottest.TestCase):
         x = tf.random_uniform(
             (self.batch_size, ) + self.event_dims, dtype=tf.float64)
 
-        ldj = parallel.forward_log_det_jacobian(
+        fldj = parallel.forward_log_det_jacobian(
             x, event_ndims=len(self.event_dims))
 
-        expected_ldj = tf.reduce_sum([
+        expected_fldj = tf.reduce_sum([
             bijector.forward_log_det_jacobian(
                 tf.gather(x, i, axis=axis),
                 event_ndims=3)
@@ -67,7 +67,7 @@ class TestParallel(tf.test.TestCase, snapshottest.TestCase):
         ], keep_dims=True)
 
         with self.test_session():
-            self.assertAllClose(ldj, expected_ldj)
+            self.assertAllClose(fldj, expected_fldj)
 
     def testInverseLogDetJacobian(self):
         axis = 1

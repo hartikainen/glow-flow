@@ -103,8 +103,7 @@ class Parallel(tfb.Bijector):
 
         self._split_axis = split_axis
 
-        if split_proportions is None:
-            self._split_proportions = (1, ) * len(bijectors)
+        self._split_proportions = split_proportions or (1, ) * len(bijectors)
 
         assert all(
             isinstance(x, int) for x in self._split_proportions
@@ -159,9 +158,10 @@ class Parallel(tfb.Bijector):
         ys = []
         for i, (bijector, split_size) in enumerate(
                 zip(bijectors, proportions)):
-            start = sum(proportions[:i])
+            i_start = sum(proportions[:i])
+            i_end = i_start + split_size
             y = bijector.forward(
-                tf.concat(split_x[start:start+split_size], axis=axis),
+                tf.concat(split_x[i_start:i_end], axis=axis),
                 **kwargs.get(bijector.name, {}))
             ys.append(y)
 
@@ -180,9 +180,10 @@ class Parallel(tfb.Bijector):
         xs = []
         for i, (bijector, split_size) in enumerate(
                 zip(bijectors, proportions)):
-            start = sum(proportions[:i])
+            i_start = sum(proportions[:i])
+            i_end = i_start + split_size
             x = bijector.inverse(
-                tf.concat(split_y[start:start+split_size], axis=axis),
+                tf.concat(split_y[i_start:i_end], axis=axis),
                 **kwargs.get(bijector.name, {}))
             xs.append(x)
 
@@ -213,19 +214,20 @@ class Parallel(tfb.Bijector):
         num_splits = tf.reduce_sum(proportions)
         split_x = tf.split(x, num_splits, axis=axis)
 
-        ldjs = []
+        fldjs = []
         for i, (bijector, split_size) in enumerate(
                 zip(bijectors, proportions)):
-            start = sum(proportions[:i])
-            ldj = bijector.forward_log_det_jacobian(
-                tf.concat(split_x[start:start+split_size], axis=axis),
+            i_start = sum(proportions[:i])
+            i_end = i_start + split_size
+            fldj = bijector.forward_log_det_jacobian(
+                tf.concat(split_x[i_start:i_end], axis=axis),
                 event_ndims=event_ndims,
                 **kwargs.get(bijector.name, {}))
-            ldjs.append(ldj)
+            fldjs.append(fldj)
 
-        full_ldj = tf.concat(ldjs, axis=axis)
+        full_fldj = tf.concat(fldjs, axis=axis)
 
-        return full_ldj
+        return full_fldj
 
     def _inverse_log_det_jacobian(self, y, **kwargs):
         y = ops.convert_to_tensor(y, name="y")
@@ -252,9 +254,10 @@ class Parallel(tfb.Bijector):
         ildjs = []
         for i, (bijector, split_size) in enumerate(
                 zip(bijectors, proportions)):
-            start = sum(proportions[:i])
+            i_start = sum(proportions[:i])
+            i_end = i_start + split_size
             ildj = bijector.inverse_log_det_jacobian(
-                tf.concat(split_y[start:start+split_size], axis=axis),
+                tf.concat(split_y[i_start:i_end], axis=axis),
                 event_ndims=event_ndims,
                 **kwargs.get(bijector.name, {}))
             ildjs.append(ildj)
