@@ -6,6 +6,10 @@ from __future__ import print_function
 
 import itertools
 
+from tensorflow.python.framework import ops
+from tensorflow.python.ops import array_ops
+from tensorflow.python.ops import math_ops
+
 import tensorflow as tf
 import numpy as np
 
@@ -17,6 +21,10 @@ __all__ = [
 
 tfd = tf.contrib.distributions
 tfb = tfd.bijectors
+
+
+def _use_static_shape(input_tensor, ndims):
+  return input_tensor.shape.is_fully_defined() and isinstance(ndims, int)
 
 
 class Parallel(tfb.Bijector):
@@ -148,18 +156,18 @@ class Parallel(tfb.Bijector):
         num_splits = tf.reduce_sum(proportions)
         split_x = tf.split(x, num_splits, axis=axis)
 
-        outs = []
+        ys = []
         for i, (bijector, split_size) in enumerate(
                 zip(bijectors, proportions)):
             start = sum(proportions[:i])
-            out = bijector.forward(
+            y = bijector.forward(
                 tf.concat(split_x[start:start+split_size], axis=axis),
                 **kwargs.get(bijector.name, {}))
-            outs.append(out)
+            ys.append(y)
 
-        full_out = tf.concat(outs, axis=axis)
+        full_y = tf.concat(ys, axis=axis)
 
-        return full_out
+        return full_y
 
     def _inverse(self, y, **kwargs):
         proportions = self._split_proportions
@@ -169,21 +177,88 @@ class Parallel(tfb.Bijector):
         num_splits = tf.reduce_sum(proportions)
         split_y = tf.split(y, num_splits, axis=axis)
 
-        outs = []
+        xs = []
         for i, (bijector, split_size) in enumerate(
                 zip(bijectors, proportions)):
             start = sum(proportions[:i])
-            out = bijector.inverse(
+            x = bijector.inverse(
                 tf.concat(split_y[start:start+split_size], axis=axis),
                 **kwargs.get(bijector.name, {}))
-            outs.append(out)
+            xs.append(x)
 
-        full_out = tf.concat(outs, axis=axis)
+        full_x = tf.concat(xs, axis=axis)
 
-        return full_out
+        return full_x
 
-    def _forward_log_det_jacobian(self, x):
-        raise NotImplementedError('_forward_log_det_jacobian')
+    def _forward_log_det_jacobian(self, x, **kwargs):
+        x = ops.convert_to_tensor(x, name="x")
 
-    def _inverse_log_det_jacobian(self, y):
-        raise NotImplementedError('_inverse_log_det_jacobian')
+        fldj = math_ops.cast(0., dtype=x.dtype.base_dtype)
+
+        if not self.bijectors:
+            return fldj
+
+        event_ndims = self._maybe_get_static_event_ndims(
+            self.forward_min_event_ndims)
+
+        if _use_static_shape(x, event_ndims):
+            event_shape = x.shape[x.shape.ndims - event_ndims:]
+        else:
+            event_shape = array_ops.shape(x)[array_ops.rank(x) - event_ndims:]
+
+        proportions = self._split_proportions
+        axis = self._split_axis
+        bijectors = self._bijectors
+
+        num_splits = tf.reduce_sum(proportions)
+        split_x = tf.split(x, num_splits, axis=axis)
+
+        ldjs = []
+        for i, (bijector, split_size) in enumerate(
+                zip(bijectors, proportions)):
+            start = sum(proportions[:i])
+            ldj = bijector.forward_log_det_jacobian(
+                tf.concat(split_x[start:start+split_size], axis=axis),
+                event_ndims=event_ndims,
+                **kwargs.get(bijector.name, {}))
+            ldjs.append(ldj)
+
+        full_ldj = tf.concat(ldjs, axis=axis)
+
+        return full_ldj
+
+    def _inverse_log_det_jacobian(self, y, **kwargs):
+        y = ops.convert_to_tensor(y, name="y")
+        ildj = math_ops.cast(0., dtype=y.dtype.base_dtype)
+
+        if not self.bijectors:
+            return ildj
+
+        event_ndims = self._maybe_get_static_event_ndims(
+            self.inverse_min_event_ndims)
+
+        if _use_static_shape(y, event_ndims):
+            event_shape = y.shape[y.shape.ndims - event_ndims:]
+        else:
+            event_shape = array_ops.shape(y)[array_ops.rank(y) - event_ndims:]
+
+        proportions = self._split_proportions
+        axis = self._split_axis
+        bijectors = self._bijectors
+
+        num_splits = tf.reduce_sum(proportions)
+        split_y = tf.split(y, num_splits, axis=axis)
+
+        ildjs = []
+        for i, (bijector, split_size) in enumerate(
+                zip(bijectors, proportions)):
+            start = sum(proportions[:i])
+            ildj = bijector.inverse_log_det_jacobian(
+                tf.concat(split_y[start:start+split_size], axis=axis),
+                event_ndims=event_ndims,
+                **kwargs.get(bijector.name, {}))
+            ildjs.append(ildj)
+
+        full_ildj = tf.concat(ildjs, axis=axis)
+
+        return full_ildj
