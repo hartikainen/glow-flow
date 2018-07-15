@@ -136,11 +136,51 @@ class Parallel(tfb.Bijector):
                 "identity" if not bijectors else
                 "_and_".join(["parallel"] + [b.name for b in bijectors])))
 
-    def _forward(self, x):
-        raise NotImplementedError('_forward')
+    @property
+    def bijectors(self):
+        return self._bijectors
 
-    def _inverse(self, y):
-        raise NotImplementedError('_inverse')
+    def _forward(self, x, **kwargs):
+        split_proportions = self._split_proportions
+        split_axis = self._split_axis
+        bijectors = self._bijectors
+
+        num_splits = tf.reduce_sum(split_proportions)
+        split_x = tf.split(x, num_splits, axis=split_axis)
+
+        outs = []
+        for (i, (bijector, split_size)) in enumerate(
+                zip(bijectors[::-1], split_proportions[::-1])):
+            start = sum(split_proportions[:i])
+            out = bijector.forward(
+                split_x[start:start+split_size],
+                **kwargs.get(bijector.name, {}))
+            outs.append(out)
+
+        full_out = tf.concat([outs], axis=split_axis)
+
+        return full_out
+
+    def _inverse(self, y, **kwargs):
+        split_proportions = self._split_proportions
+        split_axis = self._split_axis
+        bijectors = self._bijectors
+
+        num_splits = tf.reduce_sum(split_proportions)
+        split_x = tf.split(x, num_splits, axis=split_axis)
+
+        outs = []
+        for (i, (bijector, split_size)) in enumerate(
+                zip(bijectors, split_proportions)):
+            start = sum(split_proportions[:i])
+            out = bijector.forward(
+                split_x[start:start+split_size],
+                **kwargs.get(bijector.name, {}))
+            outs.append(out)
+
+        full_out = tf.concat([outs], axis=split_axis)
+
+        return full_out
 
     def _forward_log_det_jacobian(self, x):
         raise NotImplementedError('_forward_log_det_jacobian')
