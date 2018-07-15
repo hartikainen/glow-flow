@@ -18,6 +18,36 @@ class TestParallel(tf.test.TestCase, snapshottest.TestCase):
         self.batch_size = batch_size = 1
         self.event_dims = event_dims = (2,2,3)
 
+    def testForward(self):
+        axis = 1
+        bijectors = [tfb.Exp(), tfb.Softplus()]
+        parallel = Parallel(
+            bijectors=bijectors, split_axis=axis, validate_args=False)
+        x = tf.random_uniform(
+            (self.batch_size, ) + self.event_dims, dtype=tf.float32)
+        z_ = parallel.forward(x)
+
+        with self.test_session():
+            for i, bijector in enumerate(bijectors):
+                self.assertAllEqual(
+                    tf.gather(z_, i, axis=axis),
+                    bijector.forward(tf.gather(x, i, axis=axis)))
+
+    def testInverse(self):
+        axis = 1
+        bijectors = [tfb.Exp(), tfb.Softplus()]
+        parallel = Parallel(
+            bijectors=bijectors, split_axis=axis, validate_args=False)
+        z = tf.random_uniform(
+            (self.batch_size, ) + self.event_dims, dtype=tf.float32)
+        x_ = parallel.inverse(z)
+
+        with self.test_session():
+            for i, bijector in enumerate(bijectors):
+                self.assertAllEqual(
+                    tf.gather(x_, i, axis=axis),
+                    bijector.inverse(tf.gather(z, i, axis=axis)))
+
     def testBijective(self):
         bijectors = [tfb.Exp(), tfb.Softplus()]
         parallel = Parallel(
