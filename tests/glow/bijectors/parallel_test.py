@@ -101,6 +101,29 @@ class TestParallel(tf.test.TestCase, snapshottest.TestCase):
         with self.test_session():
             self.assertAllEqual(x, x_.numpy())
 
+    def testUnevenSplitProportions(self):
+        axis = 1
+        bijectors = [tfb.Exp(), tfb.Softplus()]
+        proportions = [1,2]
+        parallel = Parallel(
+            bijectors=bijectors,
+            split_axis=axis,
+            split_proportions=proportions,
+            validate_args=False)
+        event_dims = (3, 2, 3)
+        x = tf.random_uniform(
+            (self.batch_size, ) + event_dims, dtype=tf.float32)
+        z_ = parallel.forward(x)
+
+        with self.test_session():
+            for i, bijector in enumerate(bijectors):
+                i_start = sum(proportions[:i])
+                i_end = i_start + proportions[i]
+                self.assertAllEqual(
+                    tf.gather(z_, tf.range(i_start, i_end), axis=axis),
+                    bijector.forward(
+                        tf.gather(x, tf.range(i_start, i_end), axis=axis)))
+
 
 if __name__ == '__main__':
   tf.test.main()
