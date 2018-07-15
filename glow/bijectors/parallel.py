@@ -141,44 +141,44 @@ class Parallel(tfb.Bijector):
         return self._bijectors
 
     def _forward(self, x, **kwargs):
-        split_proportions = self._split_proportions
-        split_axis = self._split_axis
+        proportions = self._split_proportions
+        axis = self._split_axis
         bijectors = self._bijectors
 
-        num_splits = tf.reduce_sum(split_proportions)
-        split_x = tf.split(x, num_splits, axis=split_axis)
+        num_splits = tf.reduce_sum(proportions)
+        split_x = tf.split(x, num_splits, axis=axis)
 
         outs = []
-        for (i, (bijector, split_size)) in enumerate(
-                zip(bijectors[::-1], split_proportions[::-1])):
-            start = sum(split_proportions[:i])
+        for i, (bijector, split_size) in enumerate(
+                zip(bijectors, proportions)):
+            start = sum(proportions[:i])
             out = bijector.forward(
-                split_x[start:start+split_size],
+                tf.concat(split_x[start:start+split_size], axis=axis),
                 **kwargs.get(bijector.name, {}))
             outs.append(out)
 
-        full_out = tf.concat([outs], axis=split_axis)
+        full_out = tf.concat(outs, axis=axis)
 
         return full_out
 
     def _inverse(self, y, **kwargs):
-        split_proportions = self._split_proportions
-        split_axis = self._split_axis
+        proportions = self._split_proportions
+        axis = self._split_axis
         bijectors = self._bijectors
 
-        num_splits = tf.reduce_sum(split_proportions)
-        split_x = tf.split(x, num_splits, axis=split_axis)
+        num_splits = tf.reduce_sum(proportions)
+        split_y = tf.split(y, num_splits, axis=axis)
 
         outs = []
-        for (i, (bijector, split_size)) in enumerate(
-                zip(bijectors, split_proportions)):
-            start = sum(split_proportions[:i])
-            out = bijector.forward(
-                split_x[start:start+split_size],
+        for i, (bijector, split_size) in enumerate(
+                zip(bijectors, proportions)):
+            start = sum(proportions[:i])
+            out = bijector.inverse(
+                tf.concat(split_y[start:start+split_size], axis=axis),
                 **kwargs.get(bijector.name, {}))
             outs.append(out)
 
-        full_out = tf.concat([outs], axis=split_axis)
+        full_out = tf.concat(outs, axis=axis)
 
         return full_out
 
