@@ -33,7 +33,7 @@ class Parallel(tfb.Bijector):
     Example Use:
 
     ```python
-    parallel = Parallel([Exp(), Identity()], name="exp_identity")
+    parallel = Parallel([Exp(), Identity()], name="parallel_of_exp_and_identity")
     ```
 
     Results in:
@@ -41,10 +41,8 @@ class Parallel(tfb.Bijector):
     * Forward:
 
      ```python
-     axis = y
-     exp = Exp()
-     identity = Identity()
-     Parallel([exp, identity], axis=axis).forward(x)
+     axis = 1
+     Parallel([Exp(), Identity()], axis=axis).forward(x)
      = tf.concatenate([
            exp.forward(tf.split(x, axis=axis)),
            tf.split(x, axis=axis)
@@ -58,10 +56,8 @@ class Parallel(tfb.Bijector):
     * Inverse:
 
      ```python
-     axis = y
-     exp = Exp()
-     identity = Identity()
-     Parallel([exp, identity], axis=axis).forward(y)
+     axis = 1
+     Parallel([Exp(), Identity()], axis=axis).forward(y)
      = tf.concatenate([
            exp.inverse(tf.split(y, axis=axis)),
            tf.split(y, axis=axis)
@@ -85,6 +81,9 @@ class Parallel(tfb.Bijector):
         Args:
             bijectors: Python `list` of bijector instances. An empty list makes this
                 bijector equivalent to the `Identity` bijector.
+            split_axis: Python `int`. Axis to make the split on.
+            split_proportions: Python `list` of `int`s. The relative sizes of
+                the splits to use for each bijector.
             validate_args: Python `bool` indicating whether arguments should be
                 checked for correctness.
             name: Python `str`, name given to ops managed by this object.
@@ -105,6 +104,9 @@ class Parallel(tfb.Bijector):
 
         self._split_proportions = split_proportions or (1, ) * len(bijectors)
 
+        assert len(self._split_proportions) == len(bijectors), (
+            "Split proportion must be defined for every bijector, got {}"
+            "".format(self._split_proportions))
         assert all(
             isinstance(x, int) for x in self._split_proportions
         ), "Every element in split_proportions must be an integer."
