@@ -171,6 +171,12 @@ class GlowFlow(tfb.Bijector):
         self._image_shape = input_shape[1:]
 
         levels = [
+            GlowBijector(
+                input_shape=input_shape[1:],
+                depth=self._level_depth),
+            tfb.Identity()
+        ]
+        for i in range(1, self._num_levels):
             # Every level split the input in half (on the channel-axis),
             # and applies the next level only to the half of the split.
             # The other half flows directly into the output z. NOTE:
@@ -178,17 +184,18 @@ class GlowFlow(tfb.Bijector):
             # based on the previous levels. They don't mention this in the
             # paper however.
             # See: https://github.com/openai/glow/blob/master/model.py#L485
-            Parallel(
-                bijectors=[
-                    GlowBijector(
-                        input_shape=input_shape[1:],
-                        depth=self._level_depth),
-                    tfb.Identity()
-                ],
-                split_axis=-1,
+            levels.append(
+                Parallel(
+                    bijectors=[
+                        GlowBijector(
+                            input_shape=input_shape[1:],
+                            depth=self._level_depth),
+                        tfb.Identity()
+                    ],
+                    split_axis=-1,
+                    split_proportions=[1, 2**(i)-1]
+                )
             )
-            for l in range(self._num_levels)
-        ]
 
         # Note: tfb.Chain applies the list of bijectors in the _reverse_ order
         # of what they are inputted.
