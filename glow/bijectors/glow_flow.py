@@ -19,7 +19,7 @@ __all__ = [
 tfd = tf.contrib.distributions
 tfb = tfd.bijectors
 
-class GlowBijector(tfb.Bijector):
+class GlowStep(tfb.Bijector):
     """TODO"""
 
     def __init__(self,
@@ -30,7 +30,7 @@ class GlowBijector(tfb.Bijector):
                  forward_min_event_ndims=3,
                  name="glow_bijector",
                  *args, **kwargs):
-        """Instantiates `GlowBijector`, a single bijective step of `GlowFlow`.
+        """Instantiates `GlowStep`, a single bijective step of `GlowFlow`.
 
         Args:
             TODO
@@ -50,7 +50,7 @@ class GlowBijector(tfb.Bijector):
 
         self.built = False
 
-        super(GlowBijector, self).__init__(
+        super(GlowStep, self).__init__(
             *args,
             validate_args=validate_args,
             name=name,
@@ -171,7 +171,7 @@ class GlowFlow(tfb.Bijector):
         self._image_shape = input_shape[1:]
 
         levels = [
-            GlowBijector(
+            GlowStep(
                 input_shape=input_shape[1:],
                 depth=self._level_depth),
             tfb.Identity()
@@ -187,7 +187,7 @@ class GlowFlow(tfb.Bijector):
             levels.append(
                 Parallel(
                     bijectors=[
-                        GlowBijector(
+                        GlowStep(
                             input_shape=input_shape[1:],
                             depth=self._level_depth),
                         tfb.Identity()
