@@ -26,6 +26,8 @@ class ConvolutionPermute(tfb.Bijector):
     def __init__(self,
                  validate_args=False,
                  name="convolution_permute",
+                 inverse_min_event_ndims=3,
+                 forward_min_event_ndims=3,
                  *args, **kwargs):
         """Instantiates the `ConvolutionPermute` normalizing flow.
 
@@ -45,7 +47,12 @@ class ConvolutionPermute(tfb.Bijector):
         self.built = False
 
         super(ConvolutionPermute, self).__init__(
-            *args, validate_args=validate_args, name=name, **kwargs)
+            *args,
+            validate_args=validate_args,
+            name=name,
+            inverse_min_event_ndims=inverse_min_event_ndims,
+            forward_min_event_ndims=forward_min_event_ndims,
+            **kwargs)
 
     def build(self, input_shape):
         _, W, H, C = self._input_shape = input_shape.as_list()
