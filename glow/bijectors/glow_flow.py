@@ -7,6 +7,9 @@ from __future__ import print_function
 import tensorflow as tf
 import numpy as np
 
+from .parallel import Parallel
+from .convolution_permute import ConvolutionPermute
+
 
 __all__ = [
     "GlowFlow",
@@ -16,6 +19,113 @@ __all__ = [
 tfd = tf.contrib.distributions
 tfb = tfd.bijectors
 
+class GlowBijector(tfb.Bijector):
+    """TODO"""
+
+    def __init__(self,
+                 input_shape=None,
+                 depth=2,
+                 validate_args=False,
+                 inverse_min_event_ndims=3,
+                 forward_min_event_ndims=3,
+                 name="glow_bijector",
+                 *args, **kwargs):
+        """Instantiates `GlowBijector`, a single bijective step of `GlowFlow`.
+
+        Args:
+            TODO
+            validate_args: Python `bool` indicating whether arguments should be
+                checked for correctness.
+            name: Python `str` name given to ops managed by this object.
+
+        Raises:
+            ValueError: if TODO happens
+        """
+        self._graph_parents = []
+        self._name = name
+        self._validate_args = validate_args
+
+        self._depth = depth
+        self._input_shape = input_shape
+
+        self.built = False
+
+        super(GlowBijector, self).__init__(
+            *args,
+            validate_args=validate_args,
+            name=name,
+            inverse_min_event_ndims=inverse_min_event_ndims,
+            forward_min_event_ndims=forward_min_event_ndims,
+            **kwargs)
+
+    def build(self, input_shape):
+        self._input_shape = input_shape
+        self._image_shape = input_shape[1:]
+
+        flow_parts = []
+        for i in range(self._depth):
+            # It seems like the activation_normalization is just a
+            # regular batch_normalization with axis=-1. Also, in the original
+            # glow-paper, Kingma et al. do data dependent initialization,
+            # which I don't do here.
+            activation_normalization = tfb.BatchNormalization(
+                batchnorm_layer=tf.layers.BatchNormalization(axis=-1))
+
+            convolution_permute = ConvolutionPermute()
+
+            # We need to reshape because `tfb.RealNVP` only supports 1d input
+            flatten = tfb.Reshape(
+                event_shape_out=(-1, np.prod(self._image_shape)),
+                event_shape_in=[-1] + list(self._image_shape))
+            affine_coupling = tfb.RealNVP(
+                num_masked=np.prod(self._image_shape)//2,
+                shift_and_log_scale_fn=glow_resnet_template(
+                    image_shape=self._image_shape,
+                    filters=(512, 512),
+                    kernel_sizes=((3,3), (3,3)),
+                    activation=tf.nn.relu))
+            unflatten = tfb.Reshape(
+                event_shape_out=[-1] + list(self._image_shape),
+                event_shape_in=(-1, np.prod(self._image_shape)))
+
+            flow_parts += [
+                activation_normalization,
+                convolution_permute,
+                flatten,
+                affine_coupling,
+                unflatten,
+            ]
+
+        # Note: tfb.Chain applies the list of bijectors in the _reverse_ order
+        # of what they are inputted.
+        self.flow = tfb.Chain(list(reversed(flow_parts)))
+
+        self.built = True
+
+    def _forward(self, x):
+        if not self.built:
+            self.build(x.get_shape())
+
+        return self.flow.forward(x)
+
+    def _inverse(self, y):
+        if not self.built:
+            self.build(y.get_shape())
+
+        return self.flow.inverse(y)
+
+    def _forward_log_det_jacobian(self, x):
+        if not self.built:
+            self.build(x.get_shape())
+
+        return self.flow.forward_log_det_jacobian(x)
+
+    def _inverse_log_det_jacobian(self, y):
+        if not self.built:
+            self.build(y.get_shape())
+
+        return  self.flow.inverse_log_det_jacobian(y)
+
 
 class GlowFlow(tfb.Bijector):
     """TODO"""
@@ -24,6 +134,8 @@ class GlowFlow(tfb.Bijector):
                  num_levels=2,
                  level_depth=2,
                  validate_args=False,
+                 inverse_min_event_ndims=3,
+                 forward_min_event_ndims=3,
                  name="glow_flow",
                  *args, **kwargs):
         """Instantiates the `GlowFlow` normalizing flow.
@@ -47,47 +159,40 @@ class GlowFlow(tfb.Bijector):
         self.built = False
 
         super(GlowFlow, self).__init__(
-            *args, validate_args=validate_args, name=name, **kwargs)
+            *args,
+            validate_args=validate_args,
+            name=name,
+            inverse_min_event_ndims=inverse_min_event_ndims,
+            forward_min_event_ndims=forward_min_event_ndims,
+            **kwargs)
 
     def build(self, input_shape):
         self._input_shape = input_shape
+        self._image_shape = input_shape[1:]
 
-        flow_parts = []
-
-        for l in range(self._num_levels):
-            out = squeeze(out)
-
-            level_flow_parts = []
-
-            for k in range(self._level_depth):
-                image_shape = shape[1:]
-
-                activation_normalization = tfb.BatchNormalization(
-                    batchnorm_layer=tf.layers.BatchNormalization(axis=-1))
-                convolution_permute = ConvolutionPermute()
-                flatten = tfb.Reshape(event_shape_out=(-1, np.prod(image_shape)))
-                affine_coupling = tfb.RealNVP(
-                    num_masked=np.prod(image_shape)//2,
-                    shift_and_log_scale_fn=glow_resnet_template(
-                        hidden_layers=hidden_sizes,
-                        activation=tf.nn.relu))
-                unflatten = tfb.Reshape(event_shape_out=shape)
-
-                level_flow = tfb.Chain(reversed([
-                    activation_normalization,
-                    convolution_permute,
-                    flatten,
-                    affine_coupling,
-                    unflatten,
-                ]))
-
-                level_flow_parts.append(level_flow)
-
-            flow_parts.append(level_flow_parts)
+        levels = [
+            # Every level split the input in half (on the channel-axis),
+            # and applies the next level only to the half of the split.
+            # The other half flows directly into the output z. NOTE:
+            # In glow implementation, Kingma et al. parameterize the z
+            # based on the previous levels. They don't mention this in the
+            # paper however.
+            # See: https://github.com/openai/glow/blob/master/model.py#L485
+            Parallel(
+                bijectors=[
+                    GlowBijector(
+                        input_shape=input_shape[1:],
+                        depth=self._level_depth),
+                    tfb.Identity()
+                ],
+                split_axis=-1,
+            )
+            for l in range(self._num_levels)
+        ]
 
         # Note: tfb.Chain applies the list of bijectors in the _reverse_ order
         # of what they are inputted.
-        self.flow = tfb.Chain(list(reversed(flow_parts)))
+        self.flow = tfb.Chain(list(reversed(levels)))
         self.built = True
 
     def _forward(self, x):
@@ -128,6 +233,9 @@ class GlowFlow(tfb.Bijector):
 
 
 def glow_resnet_template(
+        image_shape,
+        filters=(512, 512),
+        kernel_sizes=((3,3), (3,3)),
         shift_only=False,
         activation=tf.nn.relu,
         name=None,
@@ -153,10 +261,10 @@ def glow_resnet_template(
         def _fn(x, output_units=None):
             """Resnet parameterized via `glow_resnet_template`."""
 
-            output_units = output_units or x.shape.as_list()[-1]
+            output_units = output_units or image_shape[-1]
 
-            filters = (512, 512)
-            kernel_sizes=((3,3), (3,3))
+            x = tf.reshape(
+                x, [-1] + list(image_shape[:2]) + [image_shape[2]//2])
 
             for filter_size, kernel_size in zip(filters, kernel_sizes):
                 x = tf.layers.conv2d(
@@ -173,15 +281,18 @@ def glow_resnet_template(
                 x = tf.layers.batch_normalization(x, axis=-1)
                 x = activation(x)
 
-            from pdb import set_trace; from pprint import pprint; set_trace()
+            output_filters = (1 if shift_only else 2) * (
+                output_units // np.prod(image_shape[:2]))
             x = tf.layers.conv2d(
                 inputs=x,
-                filters=(1 if shift_only else 2) * output_units,
+                filters=output_filters,
                 kernel_size=(3, 3),
                 strides=(1, 1),
                 padding='same',
                 kernel_initializer=tf.zeros_initializer())
             x = tf.layers.batch_normalization(x, axis=-1)
+
+            x = tf.reshape(x, [-1, np.prod(image_shape[:2]) * output_filters])
 
             if shift_only:
                 return x, None
