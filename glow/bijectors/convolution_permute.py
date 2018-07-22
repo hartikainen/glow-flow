@@ -54,13 +54,16 @@ class ConvolutionPermute(tfb.Bijector):
             **kwargs)
 
     def build(self, input_shape):
+        if self.built: return
+
         _, W, H, C = self._input_shape = input_shape.as_list()
 
-        self.w = tf.get_variable(
-            "w",
-            shape=(1, 1, C, C),
-            dtype=tf.float32,
-            initializer=tf.initializers.orthogonal())
+        with tf.variable_scope(self._name):
+            self.w = tf.get_variable(
+                "w",
+                shape=(1, 1, C, C),
+                dtype=tf.float32,
+                initializer=tf.initializers.orthogonal())
 
         self.built = True
 

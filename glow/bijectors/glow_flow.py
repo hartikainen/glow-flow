@@ -8,6 +8,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 import numpy as np
 
+from .squeeze import Squeeze
 from .parallel import Parallel
 from .convolution_permute import ConvolutionPermute
 
@@ -72,12 +73,14 @@ class GlowStep(tfb.Bijector):
             activation_normalization = tfb.BatchNormalization(
                 batchnorm_layer=tf.layers.BatchNormalization(axis=-1))
 
-            convolution_permute = ConvolutionPermute()
+            convolution_permute = ConvolutionPermute(
+                name=self._name + '/convolution_permute_{}'.format(i))
 
             # We need to reshape because `tfb.RealNVP` only supports 1d input
-            flatten = tfb.Reshape(
+            # TODO(hartikainen): This should not require inverting
+            flatten = tfb.Invert(tfb.Reshape(
                 event_shape_out=(-1, np.prod(self._image_shape)),
-                event_shape_in=[-1] + list(self._image_shape))
+                event_shape_in=[-1] + list(self._image_shape)))
             affine_coupling = tfb.RealNVP(
                 num_masked=np.prod(self._image_shape)//2,
                 shift_and_log_scale_fn=glow_resnet_template(
@@ -85,9 +88,10 @@ class GlowStep(tfb.Bijector):
                     filters=(512, 512),
                     kernel_sizes=((3, 3), (3, 3)),
                     activation=tf.nn.relu))
-            unflatten = tfb.Reshape(
+            # TODO(hartikainen): This should not require inverting
+            unflatten = tfb.Invert(tfb.Reshape(
                 event_shape_out=[-1] + list(self._image_shape),
-                event_shape_in=(-1, np.prod(self._image_shape)))
+                event_shape_in=(-1, np.prod(self._image_shape))))
 
             flow_parts += [
                 activation_normalization,
@@ -99,7 +103,8 @@ class GlowStep(tfb.Bijector):
 
         # Note: tfb.Chain applies the list of bijectors in the _reverse_ order
         # of what they are inputted.
-        self.flow = tfb.Chain(list(reversed(flow_parts)))
+        # self.flow = tfb.Chain(list(reversed(flow_parts)))
+        self.flow = tfb.Chain(flow_parts)
 
         self.built = True
 
@@ -172,10 +177,12 @@ class GlowFlow(tfb.Bijector):
         self._image_shape = input_shape[1:]
 
         levels = [
+            # TODO(hartikainen): This should not require inverting
+            tfb.Invert(Squeeze(factor=2)),
             GlowStep(
                 input_shape=input_shape[1:],
-                depth=self._level_depth),
-            tfb.Identity()
+                depth=self._level_depth,
+                name="glow_step_0"),
         ]
         for i in range(1, self._num_levels):
             # Every level split the input in half (on the channel-axis),
@@ -190,18 +197,21 @@ class GlowFlow(tfb.Bijector):
                     bijectors=[
                         GlowStep(
                             input_shape=input_shape[1:],
-                            depth=self._level_depth),
+                            depth=self._level_depth,
+                            name="glow_step_{}".format(i)),
                         tfb.Identity()
                     ],
                     split_axis=-1,
-                    split_proportions=[1, 2**(i)-1]
-                )
-            )
+                    split_proportions=[1, 2**(i)-1]))
+
+            levels.append(
+                tfb.Invert(Squeeze(factor=2)))
 
         # Note: tfb.Chain applies the list of bijectors in the _reverse_ order
         # of what they are inputted.
         self.levels = levels
-        self.flow = tfb.Chain(list(reversed(levels)))
+        # self.flow = tfb.Chain(list(reversed(levels)))
+        self.flow = tfb.Chain(levels)
         self.built = True
 
     def _forward(self, x):
@@ -273,7 +283,7 @@ def glow_resnet_template(
             output_units = output_units or image_shape[-1]
 
             x = tf.reshape(
-                x, [-1] + list(image_shape[:2]) + [image_shape[2]//2])
+                x, [-1] + image_shape[:2].as_list() + [int(image_shape[2])//2])
 
             for filter_size, kernel_size in zip(filters, kernel_sizes):
                 x = tf.layers.conv2d(
