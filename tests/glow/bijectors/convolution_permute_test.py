@@ -12,8 +12,9 @@ tf.set_random_seed(1)
 class TestConvolutionPermute(tf.test.TestCase, snapshottest.TestCase):
 
     def setUp(self):
-        self.batch_size = batch_size = 1
-        self.event_dims = event_dims = (4,4,3)
+        self.batch_size = 1
+        self.event_dims = (4, 4, 3)
+        self.event_ndims = len(self.event_dims)
         self.bijector = ConvolutionPermute(validate_args=False)
 
     def testForward(self):
@@ -38,7 +39,8 @@ class TestConvolutionPermute(tf.test.TestCase, snapshottest.TestCase):
         x = tf.random_uniform(
             (self.batch_size, ) + self.event_dims, dtype=tf.float32)
 
-        log_det_jacobian = self.bijector.forward_log_det_jacobian(x)
+        log_det_jacobian = self.bijector.forward_log_det_jacobian(
+            x, event_ndims=self.event_ndims)
 
         with self.test_session():
             self.assertMatchSnapshot(log_det_jacobian.numpy().tolist())
@@ -47,7 +49,8 @@ class TestConvolutionPermute(tf.test.TestCase, snapshottest.TestCase):
         x = tf.random_uniform(
             (self.batch_size, ) + self.event_dims, dtype=tf.float32)
 
-        inverse_log_det_jacobian = self.bijector.inverse_log_det_jacobian(x)
+        inverse_log_det_jacobian = self.bijector.inverse_log_det_jacobian(
+            x, event_ndims=self.event_ndims)
 
         with self.test_session():
             self.assertMatchSnapshot(inverse_log_det_jacobian.numpy().tolist())
@@ -62,4 +65,4 @@ class TestConvolutionPermute(tf.test.TestCase, snapshottest.TestCase):
 
 
 if __name__ == '__main__':
-  tf.test.main()
+    tf.test.main()

@@ -101,9 +101,6 @@ class ConvolutionPermute(tfb.Bijector):
             H * W * tf.cast(tf.log(abs(determinant)), tf.float32))
         return log_det_jacobian
 
-    def _inverse_log_det_jacobian(self, y):
-        return -self.forward_log_det_jacobian(y)
-
     def _maybe_assert_valid_x(self, x):
         """TODO"""
         if not self.validate_args:
