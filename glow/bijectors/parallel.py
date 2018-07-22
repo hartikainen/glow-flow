@@ -153,7 +153,7 @@ class Parallel(tfb.Bijector):
         axis = self._split_axis
         bijectors = self._bijectors
 
-        num_splits = tf.reduce_sum(proportions)
+        num_splits = sum(proportions)
         split_x = tf.split(x, num_splits, axis=axis)
 
         ys = []
@@ -175,7 +175,7 @@ class Parallel(tfb.Bijector):
         axis = self._split_axis
         bijectors = self._bijectors
 
-        num_splits = tf.reduce_sum(proportions)
+        num_splits = sum(proportions)
         split_y = tf.split(y, num_splits, axis=axis)
 
         xs = []
@@ -207,7 +207,7 @@ class Parallel(tfb.Bijector):
         axis = self._split_axis
         bijectors = self._bijectors
 
-        num_splits = tf.reduce_sum(proportions)
+        num_splits = sum(proportions)
         split_x = tf.split(x, num_splits, axis=axis)
 
         fldjs = []
@@ -239,7 +239,7 @@ class Parallel(tfb.Bijector):
         axis = self._split_axis
         bijectors = self._bijectors
 
-        num_splits = tf.reduce_sum(proportions)
+        num_splits = sum(proportions)
         split_y = tf.split(y, num_splits, axis=axis)
 
         ildjs = []
