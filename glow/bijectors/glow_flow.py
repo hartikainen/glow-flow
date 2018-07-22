@@ -19,6 +19,7 @@ __all__ = [
 tfd = tf.contrib.distributions
 tfb = tfd.bijectors
 
+
 class GlowStep(tfb.Bijector):
     """TODO"""
 
@@ -82,7 +83,7 @@ class GlowStep(tfb.Bijector):
                 shift_and_log_scale_fn=glow_resnet_template(
                     image_shape=self._image_shape,
                     filters=(512, 512),
-                    kernel_sizes=((3,3), (3,3)),
+                    kernel_sizes=((3, 3), (3, 3)),
                     activation=tf.nn.relu))
             unflatten = tfb.Reshape(
                 event_shape_out=[-1] + list(self._image_shape),
@@ -199,6 +200,7 @@ class GlowFlow(tfb.Bijector):
 
         # Note: tfb.Chain applies the list of bijectors in the _reverse_ order
         # of what they are inputted.
+        self.levels = levels
         self.flow = tfb.Chain(list(reversed(levels)))
         self.built = True
 
@@ -224,7 +226,7 @@ class GlowFlow(tfb.Bijector):
         if not self.built:
             self.build(y.get_shape())
 
-        return  self.flow.inverse_log_det_jacobian(input_)
+        return  self.flow.inverse_log_det_jacobian(y)
 
     def _maybe_assert_valid_x(self, x):
         """TODO"""
@@ -242,7 +244,7 @@ class GlowFlow(tfb.Bijector):
 def glow_resnet_template(
         image_shape,
         filters=(512, 512),
-        kernel_sizes=((3,3), (3,3)),
+        kernel_sizes=((3, 3), (3, 3)),
         shift_only=False,
         activation=tf.nn.relu,
         name=None,
@@ -250,16 +252,16 @@ def glow_resnet_template(
         **kwargs):
     """Build a scale-and-shift functions using a weight normalized resnet.
     This will be wrapped in a make_template to ensure the variables are only
-    created once. It takes the `d`-dimensional input x[0:d] and returns the `D-d`
-    dimensional outputs `loc` ("mu") and `log_scale` ("alpha").
+    created once. It takes the `d`-dimensional input x[0:d] and returns the
+    `D-d` dimensional outputs `loc` ("mu") and `log_scale` ("alpha").
     Arguments:
-      TODO
+        TODO
     Returns:
-      shift: `Float`-like `Tensor` of shift terms.
-      log_scale: `Float`-like `Tensor` of log(scale) terms.
+        shift: `Float`-like `Tensor` of shift terms.
+        log_scale: `Float`-like `Tensor` of log(scale) terms.
     Raises:
-      NotImplementedError: if rightmost dimension of `inputs` is unknown prior to
-        graph execution.
+        NotImplementedError: if rightmost dimension of `inputs` is unknown prior
+            to graph execution.
     #### References
     TODO
     """
@@ -283,7 +285,7 @@ def glow_resnet_template(
                     kernel_initializer=tf.random_normal_initializer(0.0, 0.05),
                     kernel_constraint=lambda kernel: (
                         tf.nn.l2_normalize(
-                            w, list(range(kernel.shape.ndims-1)))))
+                            kernel, list(range(kernel.shape.ndims-1)))))
 
                 x = tf.layers.batch_normalization(x, axis=-1)
                 x = activation(x)
