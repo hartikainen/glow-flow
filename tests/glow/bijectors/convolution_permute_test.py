@@ -57,7 +57,7 @@ class TestConvolutionPermute(tf.test.TestCase, snapshottest.TestCase):
     def testBijective(self):
         x = tf.random_uniform(
             (self.batch_size, ) + self.event_dims, dtype=tf.float32)
-        x_ = self.bijector.inverse(self.bijector.forward(x))
+        x_ = self.bijector.inverse(tf.identity(self.bijector.forward(x)))
 
         with self.test_session():
             self.assertAllEqual(x, x_.numpy())

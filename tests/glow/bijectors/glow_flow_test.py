@@ -22,7 +22,7 @@ class TestGlowFlow(tf.test.TestCase, snapshottest.TestCase):
             validate_args=False)
         x = tf.random_uniform(
             (self.batch_size, ) + self.event_dims, dtype=tf.float32)
-        x_ = flow.inverse(flow.forward(x))
+        x_ = flow.inverse(tf.identity(flow.forward(x)))
 
         with self.test_session():
             self.assertAllEqual(x, x_.numpy())

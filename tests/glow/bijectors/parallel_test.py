@@ -95,7 +95,7 @@ class TestParallel(tf.test.TestCase, snapshottest.TestCase):
             bijectors=bijectors, split_axis=1, validate_args=False)
         x = tf.random_uniform(
             (self.batch_size, ) + self.event_dims, dtype=tf.float32)
-        x_ = parallel.inverse(parallel.forward(x))
+        x_ = parallel.inverse(tf.identity(parallel.forward(x)))
 
         with self.test_session():
             self.assertAllEqual(x, x_.numpy())

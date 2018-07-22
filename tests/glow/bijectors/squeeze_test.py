@@ -22,7 +22,7 @@ class TestSqueeze(tf.test.TestCase, snapshottest.TestCase):
         )
         x = tf.random_uniform(
             (self.batch_size, ) + self.event_dims, dtype=tf.float32)
-        x_ = squeeze.inverse(squeeze.forward(x))
+        x_ = squeeze.inverse(tf.identity(squeeze.forward(x)))
 
         with self.test_session():
             self.assertAllEqual(x, x_.numpy())
