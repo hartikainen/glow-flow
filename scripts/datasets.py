@@ -3,27 +3,42 @@ import tensorflow as tf
 from tensorflow.python import keras
 
 
-def get_mnist():
-    (x_train, y_train), (x_test, y_test) = keras.datasets.mnist.load_data()
-    y_train = np.reshape(y_train, [-1])
-    y_test = np.reshape(y_test, [-1])
-    # Pad with zeros to make 32x32
-    x_train = np.lib.pad(x_train, ((0, 0), (2, 2), (2, 2)), 'minimum')
-    # Pad with zeros to make 32x23
-    x_test = np.lib.pad(x_test, ((0, 0), (2, 2), (2, 2)), 'minimum')
-    x_train = np.tile(np.reshape(x_train, (-1, 32, 32, 1)), (1, 1, 1, 3))
-    x_test = np.tile(np.reshape(x_test, (-1, 32, 32, 1)), (1, 1, 1, 3))
+def load_mnist(data_dir, batch_size):
+    """Build an Iterator switching between train and holdout data."""
 
-    x_train = x_train.astype(np.float32)
-    x_test = x_test.astype(np.float32)
+    (x_train, y_train), (x_eval, y_eval) = keras.datasets.mnist.load_data()
+    x_train = x_train.astype(np.float32)[..., np.newaxis]
     y_train = y_train.astype(np.float32)
-    y_test = y_test.astype(np.float32)
+    x_eval = x_eval.astype(np.float32)[..., np.newaxis]
+    y_eval = y_eval.astype(np.float32)
 
-    return (x_train, y_train), (x_test, y_test)
+    x_train = np.repeat(x_train, 3, axis=-1)
+    x_eval = np.repeat(x_eval, 3, axis=-1)
+
+    assert x_train.shape[-1] == 3
+
+    # TODO: reshaping, padding?
+
+    train_dataset = tf.data.Dataset.from_tensor_slices((x_train, y_train))
+    train_dataset = (
+        train_dataset.shuffle(50000).repeat().batch(batch_size))
+
+    def train_input_fn():
+        return train_dataset.make_one_shot_iterator().get_next()
+
+    eval_dataset = tf.data.Dataset.from_tensor_slices((x_train, y_train))
+    eval_dataset = eval_dataset.batch(batch_size)
+
+    def eval_input_fn():
+        return eval_dataset.make_one_shot_iterator().get_next()
+
+    return train_input_fn, eval_input_fn
+
 
 DATASET_LOADERS = {
-    'mnist': get_mnist
+    'mnist': load_mnist
 }
 
-def get_dataset(dataset_name):
-    return DATASET_LOADERS[dataset_name]()
+
+def get_input_fns(dataset_name, data_dir, batch_size):
+    return DATASET_LOADERS[dataset_name](data_dir, batch_size)
