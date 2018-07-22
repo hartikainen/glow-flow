@@ -56,7 +56,9 @@ class ConvolutionPermute(tfb.Bijector):
     def build(self, input_shape):
         if self.built: return
 
-        _, W, H, C = self._input_shape = input_shape.as_list()
+        self._input_shape = input_shape.as_list()
+
+        W, H, C = self._input_shape[-3:]
 
         with tf.variable_scope(self._name):
             self.w = tf.get_variable(
@@ -98,7 +100,7 @@ class ConvolutionPermute(tfb.Bijector):
         if not self.built:
             self.build(x.get_shape())
 
-        _, H, W, _ = self._input_shape
+        H, W = self._input_shape[-3:-1]
         determinant = tf.matrix_determinant(tf.cast(self.w, tf.float64))
         log_det_jacobian = (
             H * W * tf.cast(tf.log(abs(determinant)), tf.float32))
