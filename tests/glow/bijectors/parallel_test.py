@@ -1,4 +1,3 @@
-import numpy as np
 import tensorflow as tf
 import snapshottest
 
@@ -15,8 +14,8 @@ tf.set_random_seed(1)
 class TestParallel(tf.test.TestCase, snapshottest.TestCase):
 
     def setUp(self):
-        self.batch_size = batch_size = 1
-        self.event_dims = event_dims = (2,2,3)
+        self.batch_size = 1
+        self.event_dims = (2, 2, 3)
 
     def testForward(self):
         axis = 1
@@ -63,7 +62,7 @@ class TestParallel(tf.test.TestCase, snapshottest.TestCase):
             bijector.forward_log_det_jacobian(
                 tf.gather(x, i, axis=axis),
                 event_ndims=3)
-                for i, bijector in enumerate(bijectors)
+            for i, bijector in enumerate(bijectors)
         ], keep_dims=True)
 
         with self.test_session():
@@ -84,7 +83,7 @@ class TestParallel(tf.test.TestCase, snapshottest.TestCase):
             bijector.inverse_log_det_jacobian(
                 tf.gather(z, i, axis=axis),
                 event_ndims=3)
-                for i, bijector in enumerate(bijectors)
+            for i, bijector in enumerate(bijectors)
         ], keep_dims=True)
 
         with self.test_session():
@@ -104,7 +103,7 @@ class TestParallel(tf.test.TestCase, snapshottest.TestCase):
     def testUnevenSplitProportions(self):
         axis = 1
         bijectors = [tfb.Exp(), tfb.Softplus()]
-        proportions = [1,2]
+        proportions = [1, 2]
         parallel = Parallel(
             bijectors=bijectors,
             split_axis=axis,
@@ -126,4 +125,4 @@ class TestParallel(tf.test.TestCase, snapshottest.TestCase):
 
 
 if __name__ == '__main__':
-  tf.test.main()
+    tf.test.main()

@@ -1,4 +1,3 @@
-import numpy as np
 import tensorflow as tf
 import snapshottest
 
@@ -12,11 +11,15 @@ tf.set_random_seed(1)
 class TestSqueeze(tf.test.TestCase, snapshottest.TestCase):
 
     def setUp(self):
-        self.batch_size = batch_size = 1
-        self.event_dims = event_dims = (2,2,3)
+        self.batch_size = 1
+        self.event_dims = (2, 2, 3)
 
     def testBijective(self):
-        squeeze = Squeeze(validate_args=False)
+        squeeze = Squeeze(
+            validate_args=False,
+            forward_min_event_ndims=1,
+            inverse_min_event_ndims=1,
+        )
         x = tf.random_uniform(
             (self.batch_size, ) + self.event_dims, dtype=tf.float32)
         x_ = squeeze.inverse(squeeze.forward(x))
@@ -26,4 +29,4 @@ class TestSqueeze(tf.test.TestCase, snapshottest.TestCase):
 
 
 if __name__ == '__main__':
-  tf.test.main()
+    tf.test.main()

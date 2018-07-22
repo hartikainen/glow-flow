@@ -35,7 +35,7 @@ class Squeeze(tfb.Reshape):
             output_shape = (N, H//factor, W//factor, C*factor*factor)
         elif inverse_input_shape is not None:
             assert forward_input_shape is None, forward_input_shape
-            (N, H, W, C) = output_shape = forward_output_shape
+            (N, H, W, C) = output_shape = inverse_input_shape
             input_shape = (N, H//factor, W//factor, C*factor*factor)
         else:
             raise ValueError(
@@ -59,7 +59,7 @@ class Squeeze(tfb.Reshape):
 
     def _inverse(self, y):
         if not self.built:
-            self.build(inverse_input_shape=x.shape)
+            self.build(inverse_input_shape=y.shape)
 
         return tfb.Reshape._inverse(self, y)
 
@@ -67,10 +67,10 @@ class Squeeze(tfb.Reshape):
         if not self.built:
             self.build(forward_input_shape=x.shape)
 
-        return tfb.Reshape._forward_log_det_jacobian(self, y)
+        return tfb.Reshape._forward_log_det_jacobian(self, x)
 
     def _inverse_log_det_jacobian(self, y):
         if not self.built:
-            self.build(inverse_input_shape=x.shape)
+            self.build(inverse_input_shape=y.shape)
 
         return tfb.Reshape._inverse_log_det_jacobian(self, y)
