@@ -5,6 +5,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
+import tensorflow_probability as tfp
 import numpy as np
 
 from .parallel import Parallel
@@ -16,8 +17,7 @@ __all__ = [
 ]
 
 
-tfd = tf.contrib.distributions
-tfb = tfd.bijectors
+tfb = tfp.bijectors
 
 
 class GlowStep(tfb.Bijector):

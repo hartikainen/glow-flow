@@ -11,7 +11,7 @@ from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import math_ops
 
 import tensorflow as tf
-import numpy as np
+import tensorflow_probability as tfp
 
 
 __all__ = [
@@ -19,12 +19,11 @@ __all__ = [
 ]
 
 
-tfd = tf.contrib.distributions
-tfb = tfd.bijectors
+tfb = tfp.bijectors
 
 
 def _use_static_shape(input_tensor, ndims):
-  return input_tensor.shape.is_fully_defined() and isinstance(ndims, int)
+    return input_tensor.shape.is_fully_defined() and isinstance(ndims, int)
 
 
 class Parallel(tfb.Bijector):
@@ -204,11 +203,6 @@ class Parallel(tfb.Bijector):
         event_ndims = self._maybe_get_static_event_ndims(
             self.forward_min_event_ndims)
 
-        if _use_static_shape(x, event_ndims):
-            event_shape = x.shape[x.shape.ndims - event_ndims:]
-        else:
-            event_shape = array_ops.shape(x)[array_ops.rank(x) - event_ndims:]
-
         proportions = self._split_proportions
         axis = self._split_axis
         bijectors = self._bijectors
@@ -240,11 +234,6 @@ class Parallel(tfb.Bijector):
 
         event_ndims = self._maybe_get_static_event_ndims(
             self.inverse_min_event_ndims)
-
-        if _use_static_shape(y, event_ndims):
-            event_shape = y.shape[y.shape.ndims - event_ndims:]
-        else:
-            event_shape = array_ops.shape(y)[array_ops.rank(y) - event_ndims:]
 
         proportions = self._split_proportions
         axis = self._split_axis

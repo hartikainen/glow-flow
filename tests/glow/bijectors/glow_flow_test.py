@@ -1,4 +1,3 @@
-import numpy as np
 import tensorflow as tf
 import snapshottest
 
@@ -12,9 +11,9 @@ tf.set_random_seed(1)
 class TestGlowFlow(tf.test.TestCase, snapshottest.TestCase):
 
     def setUp(self):
-        self.batch_size = batch_size = 1
+        self.batch_size = 1
         # event_dims = image_size
-        self.event_dims = event_dims = (8,8,4)
+        self.event_dims = (8, 8, 4)
 
     def testBijective(self):
         flow = GlowFlow(

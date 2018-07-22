@@ -4,8 +4,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
-import numpy as np
+import tensorflow_probability as tfp
 
 
 __all__ = [
@@ -13,8 +12,7 @@ __all__ = [
 ]
 
 
-tfd = tf.contrib.distributions
-tfb = tfd.bijectors
+tfb = tfp.bijectors
 
 
 class Squeeze(tfb.Reshape):
