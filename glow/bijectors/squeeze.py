@@ -42,11 +42,11 @@ class Squeeze(tfb.Reshape):
         if forward_input_shape is not None:
             assert inverse_input_shape is None, inverse_input_shape
             (H, W, C) = input_shape = forward_input_shape[-3:]
-            output_shape = (-1, H//factor, W//factor, C*factor*factor)
+            output_shape = (H//factor, W//factor, C*factor*factor)
         elif inverse_input_shape is not None:
             assert forward_input_shape is None, forward_input_shape
             (H, W, C) = output_shape = inverse_input_shape[-3:]
-            input_shape = (-1, H*factor, W*factor, C/(factor*factor))
+            input_shape = (H*factor, W*factor, C/(factor*factor))
         else:
             raise ValueError(
                 "Exactly one of {forward_input_shape, inverse_input_shape}"
