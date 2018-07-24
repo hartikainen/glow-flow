@@ -177,13 +177,12 @@ class GlowFlow(tfb.Bijector):
         self._image_shape = input_shape[1:]
 
         levels = [
-            # TODO(hartikainen): This should not require inverting
-            tfb.Invert(Squeeze(factor=2)),
             GlowStep(
                 input_shape=input_shape[1:],
                 depth=self._level_depth,
                 name="glow_step_0"),
         ]
+        levels = []
         for i in range(1, self._num_levels):
             # Every level split the input in half (on the channel-axis),
             # and applies the next level only to the half of the split.
@@ -203,9 +202,6 @@ class GlowFlow(tfb.Bijector):
                     ],
                     split_axis=-1,
                     split_proportions=[1, 2**(i)-1]))
-
-            levels.append(
-                tfb.Invert(Squeeze(factor=2)))
 
         # Note: tfb.Chain applies the list of bijectors in the _reverse_ order
         # of what they are inputted.

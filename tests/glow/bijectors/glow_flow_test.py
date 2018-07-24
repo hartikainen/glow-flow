@@ -2,6 +2,7 @@ import tensorflow as tf
 import snapshottest
 
 from glow.bijectors import GlowFlow
+from glow.bijectors.squeeze import Squeeze
 
 
 tf.enable_eager_execution()
@@ -13,7 +14,7 @@ class TestGlowFlow(tf.test.TestCase, snapshottest.TestCase):
     def setUp(self):
         self.batch_size = 1
         # event_dims = image_size
-        self.event_dims = (8, 8, 4)
+        self.event_dims = (32, 32, 3)
 
     def testBijective(self):
         flow = GlowFlow(
@@ -22,7 +23,13 @@ class TestGlowFlow(tf.test.TestCase, snapshottest.TestCase):
             validate_args=False)
         x = tf.random_uniform(
             (self.batch_size, ) + self.event_dims, dtype=tf.float32)
-        x_ = flow.inverse(tf.identity(flow.forward(x)))
+        # Squeeze to get even last dimension size
+        x = Squeeze(factor=2).forward(x)
+        z = flow.inverse(x)
+        x_ = flow.forward(tf.identity(z))
+
+        assert z.shape == x.shape
+
 
         with self.test_session():
             self.assertAllEqual(x, x_.numpy())
