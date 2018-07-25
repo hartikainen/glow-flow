@@ -33,7 +33,6 @@ class Squeeze(tfb.Bijector):
                  **kwargs):
         """Instantiates the `Squeeze` reshaping bijector."""
         self._factor = factor
-        self.built = False
 
         # Note that the super is not for Squeeze but Reshape
         super(Squeeze, self).__init__(
@@ -46,45 +45,41 @@ class Squeeze(tfb.Bijector):
     def factor(self):
         return self._factor
 
-    def build(self, forward_input_shape=None, inverse_input_shape=None):
-        factor = self._factor
-
-        if forward_input_shape is not None:
-            assert inverse_input_shape is None, inverse_input_shape
-            (H, W, C) = input_shape = forward_input_shape[-3:]
-            intermediate_shape = (H//factor, factor, W//factor, factor, C)
-            output_shape = (H//factor, W//factor, C*factor**2)
-        elif inverse_input_shape is not None:
-            assert forward_input_shape is None, forward_input_shape
-            (H, W, C) = output_shape = inverse_input_shape[-3:]
-            intermediate_shape = (H, W, C//factor**2, factor, factor)
-            input_shape = (H*factor, W*factor, C//factor**2)
-        else:
-            raise ValueError(
-                "Exactly one of {forward_input_shape, inverse_input_shape}"
-                " must be defined.")
-
-        self._bijectors = [
-            tfb.Reshape(
-                event_shape_in=input_shape,
-                event_shape_out=intermediate_shape),
-            Transpose(perm=[0, 1, 3, 5, 2, 4]),
-            tfb.Reshape(
-                event_shape_in=intermediate_shape,
-                event_shape_out=output_shape),
-        ]
-        self._flow = tfb.Chain(list(reversed(self._bijectors)))
-        self.built = True
-
     def _forward(self, x):
-        if not self.built:
-            self.build(forward_input_shape=x.shape.as_list())
-        return self._flow.forward(x)
+        factor = self._factor
+        (H, W, C) = x.shape[-3:]
+        intermediate_event_shape = (H//factor, factor, W//factor, factor, C)
+        output_event_shape = (H//factor, W//factor, C*factor**2)
+
+        sample_batch_shape = tf.shape(x)[:-3]
+        intermediate_shape = tf.concat([
+            sample_batch_shape, intermediate_event_shape], axis=0)
+        output_shape = tf.concat([
+            sample_batch_shape, output_event_shape], axis=0)
+
+        y = tf.reshape(x, intermediate_shape)
+        y = tf.transpose(y, [0, 1, 3, 5, 2, 4])
+        y = tf.reshape(y, output_shape)
+
+        return y
 
     def _inverse(self, y):
-        if not self.built:
-            self.build(inverse_input_shape=y.shape.as_list())
-        return self._flow.inverse(y)
+        factor = self._factor
+        (H, W, C) = y.shape[-3:]
+        intermediate_event_shape = (H, W, C//factor**2, factor, factor)
+        output_event_shape = (H*factor, W*factor, C//factor**2)
+
+        sample_batch_shape = tf.shape(y)[:-3]
+        intermediate_shape = tf.concat([
+            sample_batch_shape, intermediate_event_shape], axis=0)
+        output_shape = tf.concat([
+            sample_batch_shape, output_event_shape], axis=0)
+
+        x = tf.reshape(y, intermediate_shape)
+        x = tf.transpose(x, [0, 1, 4, 2, 5, 3])
+        x = tf.reshape(x, output_shape)
+
+        return x
 
     def _forward_log_det_jacobian(self, x, *args, **kwargs):
         return tf.constant(0.0, dtype=x.dtype)
