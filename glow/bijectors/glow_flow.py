@@ -176,14 +176,8 @@ class GlowFlow(tfb.Bijector):
         self._input_shape = input_shape
         self._image_shape = input_shape[1:]
 
-        levels = [
-            GlowStep(
-                input_shape=input_shape[1:],
-                depth=self._level_depth,
-                name="glow_step_0"),
-        ]
         levels = []
-        for i in range(1, self._num_levels):
+        for i in range(self._num_levels):
             # Every level split the input in half (on the channel-axis),
             # and applies the next level only to the half of the split.
             # The other half flows directly into the output z. NOTE:
@@ -192,16 +186,23 @@ class GlowFlow(tfb.Bijector):
             # paper however.
             # See: https://github.com/openai/glow/blob/master/model.py#L485
             levels.append(
-                Parallel(
-                    bijectors=[
-                        GlowStep(
-                            input_shape=input_shape[1:],
-                            depth=self._level_depth,
-                            name="glow_step_{}".format(i)),
-                        tfb.Identity()
-                    ],
-                    split_axis=-1,
-                    split_proportions=[1, 2**(i)-1]))
+                tfb.Chain([
+                    tfb.Invert(Squeeze(factor=2**(i+1))),
+                    Parallel(
+                        bijectors=[
+                            GlowStep(
+                                # Infer at the time of first forward
+                                input_shape=None,
+                                depth=self._level_depth,
+                                name="glow_step_{}".format(i)),
+                            tfb.Identity(),
+                        ],
+                        split_axis=-1,
+                        split_proportions=[1, 2**(i)-1]
+                    ),
+                    Squeeze(factor=2**(i+1))
+                ])
+            )
 
         # Note: tfb.Chain applies the list of bijectors in the _reverse_ order
         # of what they are inputted.
