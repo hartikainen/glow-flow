@@ -42,6 +42,10 @@ class Squeeze(tfb.Bijector):
             *args,
             **kwargs)
 
+    @property
+    def factor(self):
+        return self._factor
+
     def build(self, forward_input_shape=None, inverse_input_shape=None):
         factor = self._factor
 
