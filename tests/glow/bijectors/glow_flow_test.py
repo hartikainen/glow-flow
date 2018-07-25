@@ -61,6 +61,10 @@ class TestGlowFlow(tf.test.TestCase, snapshottest.TestCase):
             # expectation
             pass
 
+    def testVerifyTrainableVariables(self):
+        raise NotImplementedError(
+            "Should test that the trainable variables match expectation")
+
 
 if __name__ == '__main__':
     tf.test.main()
