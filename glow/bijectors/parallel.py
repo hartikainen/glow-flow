@@ -103,7 +103,14 @@ class Parallel(tfb.Bijector):
 
         self._split_proportions = split_proportions or (1, ) * len(bijectors)
 
-        assert len(self._split_proportions) == len(bijectors), (
+        self._bijectors, self._split_proportions = zip(*[
+            (bijector, split_proportion)
+            for bijector, split_proportion in
+            zip(self._bijectors, self._split_proportions)
+            if split_proportion > 0
+        ])
+
+        assert len(self._split_proportions) == len(self._bijectors), (
             "Split proportion must be defined for every bijector, got {}"
             "".format(self._split_proportions))
         assert all(
