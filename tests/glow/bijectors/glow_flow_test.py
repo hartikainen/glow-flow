@@ -1,7 +1,7 @@
 import tensorflow as tf
 import snapshottest
 
-from glow.bijectors import GlowFlow
+from glow.bijectors import GlowFlow, GlowStep
 from glow.bijectors.squeeze import Squeeze
 
 
@@ -59,6 +59,30 @@ class TestGlowFlow(tf.test.TestCase, snapshottest.TestCase):
             # TODO: Test somehow that all the passthrough values match
             # expectation
             pass
+
+    def testVerifyTrainableVariables(self):
+        raise NotImplementedError(
+            "Should test that the trainable variables match expectation")
+
+
+class TestGlowStep(tf.test.TestCase, snapshottest.TestCase):
+
+    def setUp(self):
+        self.batch_size = 1
+        # event_dims = image_size
+        self.event_dims = (8, 8, 3)
+
+    def testForward(self):
+        step = GlowStep(depth=2, validate_args=False)
+        x = Squeeze(factor=2).forward(
+            tf.random_uniform(
+                (self.batch_size, ) + self.event_dims, dtype=tf.float32))
+        z = step.forward(x)
+
+        self.assertEqual(x.shape, z.shape)
+
+        # with self.test_session():
+        #     self.assertMatchSnapshot(x.numpy().tolist())
 
     def testVerifyTrainableVariables(self):
         raise NotImplementedError(
