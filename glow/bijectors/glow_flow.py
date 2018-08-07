@@ -137,7 +137,7 @@ class GlowFlow(tfb.Bijector):
     """TODO"""
 
     def __init__(self,
-                 num_levels=2,
+                 level=2,
                  level_depth=2,
                  validate_args=False,
                  inverse_min_event_ndims=3,
@@ -159,7 +159,7 @@ class GlowFlow(tfb.Bijector):
         self._name = name
         self._validate_args = validate_args
 
-        self._num_levels = num_levels
+        self._level = level
         self._level_depth = level_depth
 
         self.built = False
@@ -189,18 +189,18 @@ class GlowFlow(tfb.Bijector):
                 # Infer at the time of first forward
                 input_shape=None,
                 depth=self._level_depth,
-                name="glow_step_{}".format(self._num_levels)),
+                name="glow_step_{}".format(self._level)),
         ]
 
-        if self._num_levels > 1:
+        if self._level > 1:
             self.flow_steps += [
                 Parallel(
                     bijectors=[
                         tfb.Identity(),
                         GlowFlow(
-                            num_levels=self._num_levels - 1,
+                            level=self._level - 1,
                             level_depth=self._level_depth,
-                            name="glow_flow_{}".format(self._num_levels-1)),
+                            name="glow_flow_{}".format(self._level-1)),
                     ],
                     split_axis=-1,
                     split_proportions=[1, 1]

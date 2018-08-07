@@ -134,7 +134,7 @@ def model_fn(features, labels, mode, params, config):
         scale_diag=tf.ones(features.shape[-3:]))
 
     glow_flow = GlowFlow(
-        num_levels=params['num_levels'],
+        level=params['num_levels'],
         level_depth=params['level_depth'])
 
     transformed_glow_flow = tfd.TransformedDistribution(
