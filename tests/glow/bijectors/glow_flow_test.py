@@ -46,6 +46,17 @@ class TestGlowFlow(tf.test.TestCase, snapshottest.TestCase):
         # with self.test_session():
         #     self.assertMatchSnapshot(z.numpy().tolist())
 
+    def testSingleLevelShapes(self):
+        num_levels = 1
+        flow = GlowFlow(
+            level=num_levels, level_depth=2, validate_args=False)
+        event_dims = (64, 64, 8)
+        x = tf.random_uniform(
+            (self.batch_size, ) + event_dims, dtype=tf.float32)
+        z = flow.forward(x)
+
+        self.assertEqual(x.shape, z.shape)
+
     def testParallelPassthrough(self):
         num_levels = 3
         flow = GlowFlow(
