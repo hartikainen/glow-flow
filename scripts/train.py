@@ -144,10 +144,10 @@ def model_fn(features, labels, mode, params, config):
 
     image_tile_summary("input", tf.to_float(features), rows=1, cols=16)
 
-    z = glow_flow.inverse(features)
+    z = glow_flow.forward(features)
     prior_log_probs = base_distribution.log_prob(z)
     prior_log_likelihood = -tf.reduce_mean(prior_log_probs)
-    log_det_jacobians = glow_flow.inverse_log_det_jacobians(features)
+    log_det_jacobians = glow_flow.log_det_jacobians(features)
     log_probs = log_det_jacobians + log_det_jacobians
 
     # Sanity check, remove when tested

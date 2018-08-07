@@ -77,10 +77,9 @@ class GlowStep(tfb.Bijector):
                 name=self._name + '/convolution_permute_{}'.format(i))
 
             # We need to reshape because `tfb.RealNVP` only supports 1d input
-            # TODO(hartikainen): This should not require inverting
-            flatten = tfb.Invert(tfb.Reshape(
+            flatten = tfb.Reshape(
                 event_shape_out=(-1, np.prod(self._image_shape)),
-                event_shape_in=[-1] + list(self._image_shape)))
+                event_shape_in=(-1, *self._image_shape))
             affine_coupling = tfb.RealNVP(
                 num_masked=np.prod(self._image_shape)//2,
                 shift_and_log_scale_fn=glow_resnet_template(
@@ -88,10 +87,9 @@ class GlowStep(tfb.Bijector):
                     filters=(512, 512),
                     kernel_sizes=((3, 3), (3, 3)),
                     activation=tf.nn.relu))
-            # TODO(hartikainen): This should not require inverting
-            unflatten = tfb.Invert(tfb.Reshape(
-                event_shape_out=[-1] + list(self._image_shape),
-                event_shape_in=(-1, np.prod(self._image_shape))))
+            unflatten = tfb.Reshape(
+                event_shape_out=(-1, *self._image_shape),
+                event_shape_in=(-1, np.prod(self._image_shape)))
 
             flow_parts += [
                 activation_normalization,
@@ -103,8 +101,7 @@ class GlowStep(tfb.Bijector):
 
         # Note: tfb.Chain applies the list of bijectors in the _reverse_ order
         # of what they are inputted.
-        # self.flow = tfb.Chain(list(reversed(flow_parts)))
-        self.flow = tfb.Chain(flow_parts)
+        self.flow = tfb.Chain(list(reversed(flow_parts)))
 
         self.built = True
 
@@ -283,7 +280,7 @@ def glow_resnet_template(
             output_units = output_units or image_shape[-1]
 
             x = tf.reshape(
-                x, [-1] + image_shape[:2].as_list() + [int(image_shape[2])//2])
+                x, (-1, *image_shape[:2].as_list(), int(image_shape[2])//2))
 
             for filter_size, kernel_size in zip(filters, kernel_sizes):
                 x = tf.layers.conv2d(
