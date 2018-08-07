@@ -149,7 +149,8 @@ class Parallel(tfb.Bijector):
             dtype=dtype,
             name=name or (
                 "identity" if not bijectors else
-                "_and_".join(["parallel"] + [b.name for b in bijectors])))
+                ("parallel_of_"
+                 + "_and_".join([b.name for b in bijectors]))))
 
     @property
     def bijectors(self):
