@@ -82,7 +82,7 @@ class GlowStep(tfb.Bijector):
                 event_shape_in=(-1, *self._image_shape))
             affine_coupling = tfb.RealNVP(
                 num_masked=np.prod(self._image_shape)//2,
-                shift_and_log_scale_fn=glow_resnet_template(
+                shift_and_log_scale_fn=glow_conv_net_template(
                     image_shape=self._image_shape,
                     filters=(512, 512),
                     kernel_sizes=((3, 3), (3, 3)),
@@ -248,7 +248,7 @@ class GlowFlow(tfb.Bijector):
         raise NotImplementedError("_maybe_assert_valid_y")
 
 
-def glow_resnet_template(
+def glow_conv_net_template(
         image_shape,
         filters=(512, 512),
         kernel_sizes=((3, 3), (3, 3)),
@@ -257,7 +257,8 @@ def glow_resnet_template(
         name=None,
         *args,
         **kwargs):
-    """Build a scale-and-shift functions using a weight normalized resnet.
+    """Build a scale-and-shift functions using a weight normalized conv_net.
+
     This will be wrapped in a make_template to ensure the variables are only
     created once. It takes the `d`-dimensional input x[0:d] and returns the
     `D-d` dimensional outputs `loc` ("mu") and `log_scale` ("alpha").
@@ -273,9 +274,9 @@ def glow_resnet_template(
     TODO
     """
 
-    with tf.name_scope(name, "glow_resnet_template"):
+    with tf.name_scope(name, "glow_conv_net_template"):
         def _fn(x, output_units=None):
-            """Resnet parameterized via `glow_resnet_template`."""
+            """Conv_Net parameterized via `glow_conv_net_template`."""
 
             output_units = output_units or image_shape[-1]
 
@@ -316,4 +317,4 @@ def glow_resnet_template(
             shift, log_scale = tf.split(x, 2, axis=-1)
             return shift, log_scale
 
-        return tf.make_template("glow_resnet_template", _fn)
+        return tf.make_template("glow_conv_net_template", _fn)
